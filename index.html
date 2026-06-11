@@ -2,40 +2,40 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>文化祭 ARシューティング（レイアウト完全修正版）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>文化祭 ARシューティング（サイズバグ修正版）</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <style>
-        /* スマホの画面サイズ狂いを徹底ガード */
+        /* 画面全体のズレやスクロール、巨大化を完全に禁止 */
         html, body { 
             margin: 0; padding: 0; width: 100%; height: 100dvh; 
             overflow: hidden; user-select: none; touch-action: none; 
             background-color: #000;
         }
 
-        /* 全ての画面を同じ大きさでピタッと重ねる箱 */
+        /* 全ての画面を同じ大きさでピタッと重ねる箱（巨大化防止） */
         .game-container {
             position: relative; width: 100%; height: 100dvh; overflow: hidden;
         }
 
-        /* 🎥 カメラ映像（最背面: z-index 1） */
+        /* 🎥 カメラ映像（一番奥） */
         #webcam {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; z-index: 1;
         }
 
-        /* 🌌 AR空間（z-index 2） */
+        /* 🌌 AR空間（embeddedを追加して勝手な拡大を強制ストップ！） */
         a-scene {
             position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important;
             z-index: 2; pointer-events: none;
         }
 
-        /* 🎯 画面中央の照準（z-index 10） */
+        /* 🎯 画面中央の照準 */
         #reticle {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 30px; height: 30px;
-            border: 4px solid white; border-radius: 50%;
+            width: 24px; height: 24px;
+            border: 3px solid white; border-radius: 50%;
             z-index: 10; pointer-events: none; opacity: 0.8;
         }
         #reticle::after {
@@ -44,27 +44,27 @@
             width: 6px; height: 6px; background: white; border-radius: 50%;
         }
 
-        /* 💥 弾の発射エフェクト（z-index 9） */
+        /* 💥 弾の発射エフェクト */
         #flash-effect {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%) scale(0);
-            width: 120px; height: 120px;
-            border: 8px solid #ffeb3b; border-radius: 50%;
+            width: 100px; height: 100px;
+            border: 6px solid #ffeb3b; border-radius: 50%;
             background: rgba(255, 235, 59, 0.2);
             z-index: 9; pointer-events: none; opacity: 0;
         }
         .flash-animation { animation: flash 0.12s ease-out; }
         @keyframes flash {
-            0% { transform: translate(-50%, -50%) scale(0.1); opacity: 1; border-width: 10px; }
-            100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; border-width: 1px; }
+            0% { transform: translate(-50%, -50%) scale(0.1); opacity: 1; border-width: 8px; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; border-width: 1px; }
         }
 
-        /* 📈 得点ポップアップ演出（z-index 11） */
+        /* 📈 得点ポップアップ演出 */
         #score-popup {
             position: absolute; top: 40%; left: 50%;
             transform: translate(-50%, -50%);
-            color: #ffeb3b; font-family: sans-serif; font-size: 28px; font-weight: bold;
-            text-shadow: 0 0 8px rgba(0,0,0,1); z-index: 11; pointer-events: none; opacity: 0;
+            color: #ffeb3b; font-family: sans-serif; font-size: 24px; font-weight: bold;
+            text-shadow: 0 0 6px rgba(0,0,0,1); z-index: 11; pointer-events: none; opacity: 0;
         }
         .popup-animation { animation: popup 0.4s ease-out; }
         @keyframes popup {
@@ -73,56 +73,56 @@
             100% { transform: translate(-50%, -70%) scale(1.0); opacity: 0; }
         }
 
-        /* ⏱️ タイマーとスコアのUI（プレイ中のみ最前面の左上: z-index 20） */
+        /* ⏱️ タイマーとスコアのUI（見やすいよう少しコンパクトに修正） */
         #ui {
-            position: absolute; top: 20px; left: 20px; z-index: 20;
-            color: #ffffff; font-family: sans-serif; font-size: 18px; font-weight: bold;
-            background: rgba(0, 0, 0, 0.7); padding: 10px 15px; border-radius: 8px;
-            pointer-events: none; border: 2px solid rgba(255, 255, 255, 0.2);
-            display: none; /* 最初は非表示 */
+            position: absolute; top: 15px; left: 15px; z-index: 20;
+            color: #ffffff; font-family: sans-serif; font-size: 16px; font-weight: bold;
+            background: rgba(0, 0, 0, 0.75); padding: 8px 12px; border-radius: 6px;
+            pointer-events: none; border: 1.5px solid rgba(255, 255, 255, 0.2);
+            display: none;
         }
 
-        /* 🔴 撃つボタン（プレイ中のみ最前面の下中央: z-index 25） */
+        /* 🔴 撃つボタン（スマホの誤操作がないサイズに最適化） */
         #shoot-btn {
-            position: absolute; bottom: 40px; left: 50%;
+            position: absolute; bottom: 30px; left: 50%;
             transform: translateX(-50%);
-            width: 100px; height: 100px;
+            width: 85px; height: 85px;
             z-index: 25; background: rgba(255, 0, 0, 0.85);
             color: white; border: 4px solid white; border-radius: 50%;
-            font-size: 22px; font-weight: bold; font-family: sans-serif;
-            cursor: pointer; box-shadow: 0 6px 15px rgba(0,0,0,0.5);
+            font-size: 18px; font-weight: bold; font-family: sans-serif;
+            cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             outline: none; -webkit-tap-highlight-color: transparent;
-            display: none; /* 最初は非表示 */
+            display: none;
         }
         #shoot-btn:active { transform: translateX(-50%) scale(0.90); background: rgba(255, 0, 0, 0.95); }
 
-        /* 🟢 起動時の「タイトル画面」（最前面を完全にロック: z-index 40） */
+        /* 🟢 起動時の「タイトル画面」（ド真ん中に完全に固定） */
         #start-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 40; background: rgba(0, 0, 0, 0.85);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             color: white; font-family: sans-serif;
         }
-        #start-screen h1 { font-size: 28px; color: #ffeb3b; margin: 0 0 30px 0; text-align: center; padding: 0 20px; }
+        #start-screen h1 { font-size: 24px; color: #ffeb3b; margin: 0 0 25px 0; text-align: center; padding: 0 20px; }
         #start-btn {
-            padding: 15px 50px; font-size: 24px; font-weight: bold;
-            background-color: #4caf50; color: white; border: none; border-radius: 30px; cursor: pointer;
-            box-shadow: 0 4px 15px rgba(76,175,80,0.4);
+            padding: 12px 40px; font-size: 20px; font-weight: bold;
+            background-color: #4caf50; color: white; border: none; border-radius: 25px; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(76,175,80,0.4);
         }
         #start-btn:active { transform: scale(0.95); }
 
-        /* 🏁 ゲーム終了画面（z-index 50） */
+        /* 🏁 ゲーム終了画面 */
         #result-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 50; background: rgba(0, 0, 0, 0.9);
             display: none; flex-direction: column; justify-content: center; align-items: center;
             color: white; font-family: sans-serif;
         }
-        #result-screen h2 { font-size: 32px; color: #ffeb3b; margin: 0; }
-        #final-score { font-size: 60px; font-weight: bold; margin: 20px 0 40px 0; }
+        #result-screen h2 { font-size: 28px; color: #ffeb3b; margin: 0; }
+        #final-score { font-size: 50px; font-weight: bold; margin: 15px 0 30px 0; }
         #retry-btn {
-            padding: 15px 40px; font-size: 20px; font-weight: bold;
-            background-color: #ff5722; color: white; border: none; border-radius: 30px; cursor: pointer;
+            padding: 12px 35px; font-size: 18px; font-weight: bold;
+            background-color: #ff5722; color: white; border: none; border-radius: 25px; cursor: pointer;
         }
     </style>
 </head>
@@ -154,7 +154,7 @@
             <button id="retry-btn">リトライ</button>
         </div>
 
-        <a-scene vr-mode-ui="enabled: false">
+        <a-scene embedded vr-mode-ui="enabled: false">
             <a-entity id="camera" camera look-controls raycaster="objects: .target; interval: 100"></a-entity>
             
             <a-assets>
@@ -216,12 +216,12 @@
 
         const scoreDisplay = document.getElementById('score');
         const timerDisplay = document.getElementById('timer');
-        const uiContainer = document.getElementById('ui');            // プレイ中UIの箱
-        const startScreen = document.getElementById('start-screen');  // タイトル画面
-        const startBtn = document.getElementById('start-btn');        // スタートボタン
+        const uiContainer = document.getElementById('ui');
+        startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
         const resultScreen = document.getElementById('result-screen');
         const finalScoreDisplay = document.getElementById('final-score');
-        const shootBtn = document.getElementById('shoot-btn');        // 撃つボタン
+        const shootBtn = document.getElementById('shoot-btn');
         const retryBtn = document.getElementById('retry-btn');
         const scene = document.querySelector('a-scene');
         const raycasterEntity = document.getElementById('camera');
@@ -237,7 +237,6 @@
             score = 0; timeLeft = 30; isPlaying = true;
             scoreDisplay.textContent = score; timerDisplay.textContent = timeLeft;
             
-            // ★画面の切り替え（タイトルと終了画面を隠し、ゲームUIと撃つボタンを出す）
             startScreen.style.display = 'none';
             resultScreen.style.display = 'none';
             uiContainer.style.display = 'block';
@@ -259,7 +258,6 @@
             clearInterval(gameInterval); isPlaying = false;
             finalScoreDisplay.textContent = score + " 点";
             
-            // ★終了時はゲーム中のUIを隠す
             uiContainer.style.display = 'none';
             shootBtn.style.display = 'none';
             resultScreen.style.display = 'flex';

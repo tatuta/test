@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>文化祭 FPS風 ARシューティング（20キャラ版）</title>
+    <title>文化祭 FPS風 ARシューティング</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; user-select: none; touch-action: none; }
@@ -12,20 +12,22 @@
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; z-index: -1;
         }
-        /* プレイ中のUI */
+        
+        /* ★タイマーとスコアのUI（絶対に隠れないよう z-index を 9999 に強化） */
         #ui {
-            position: fixed; top: 10px; left: 10px; z-index: 10;
-            color: white; font-family: sans-serif; font-size: 18px;
-            background: rgba(0,0,0,0.6); padding: 10px 15px; border-radius: 8px;
-            pointer-events: none;
+            position: fixed; top: 20px; left: 20px; z-index: 9999;
+            color: #ffffff; font-family: sans-serif; font-size: 20px; font-weight: bold;
+            background: rgba(0, 0, 0, 0.7); padding: 12px 18px; border-radius: 10px;
+            pointer-events: none; border: 2px solid rgba(255, 255, 255, 0.2);
         }
-        /* 照準 */
+        
+        /* 画面中央の照準 */
         #reticle {
             position: fixed; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             width: 30px; height: 30px;
             border: 4px solid white; border-radius: 50%;
-            z-index: 15; pointer-events: none;
+            z-index: 9990; pointer-events: none;
             opacity: 0.8;
         }
         #reticle::after {
@@ -40,7 +42,7 @@
             width: 120px; height: 120px;
             border: 8px solid #ffeb3b; border-radius: 50%;
             background: rgba(255, 235, 59, 0.2);
-            z-index: 14; pointer-events: none;
+            z-index: 9980; pointer-events: none;
             opacity: 0;
         }
         .flash-animation {
@@ -53,10 +55,10 @@
         }
         /* 撃つボタン */
         #shoot-btn {
-            position: fixed; bottom: 30px; left: 50%;
+            position: fixed; bottom: 40px; left: 50%;
             transform: translateX(-50%);
             width: 110px; height: 110px;
-            z-index: 20; background: rgba(255, 0, 0, 0.75);
+            z-index: 9995; background: rgba(255, 0, 0, 0.8);
             color: white; border: 5px solid white; border-radius: 50%;
             font-size: 24px; font-weight: bold; font-family: sans-serif;
             cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.5);
@@ -67,7 +69,7 @@
         /* ゲーム終了画面 */
         #result-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 30; background: rgba(0, 0, 0, 0.9);
+            z-index: 99999; background: rgba(0, 0, 0, 0.9);
             display: none; flex-direction: column; justify-content: center; align-items: center;
             color: white; font-family: sans-serif;
         }
@@ -81,13 +83,16 @@
 </head>
 <body>
     <video id="webcam" autoplay playsinline></video>
+
+    <div id="ui">
+        <div>⏱️ タイム: <span id="timer">30</span> 秒</div>
+        <div>🎯 スコア: <span id="score">0</span> 点</div>
+    </div>
+
     <div id="reticle"></div>
     <div id="flash-effect"></div>
     <button id="shoot-btn">撃つ</button>
-    <div id="ui">
-        <div>⏱️: <span id="timer">30</span> 秒</div>
-        <div>🎯: <span id="score">0</span> 点</div>
-    </div>
+
     <div id="result-screen">
         <h2>タイムアップ！</h2>
         <p>スコア</p>
@@ -128,7 +133,7 @@
             .then(stream => { document.getElementById('webcam').srcObject = stream; })
             .catch(err => { alert("カメラの起動に失敗しました。"); });
 
-        // 音声合成システム（確実に鳴るシステム）
+        // 音声合成システム
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); }
@@ -151,8 +156,8 @@
         let gameInterval;
         let isPlaying = false;
         
-        const ENEMY_COUNT = 8; // 同時に空間に出現させる数（20種類の中からランダムに8枚が選ばれます）
-        const TOTAL_CHARACTER_TYPES = 20; // ★敵キャラクターの種類の総数
+        const ENEMY_COUNT = 8; 
+        const TOTAL_CHARACTER_TYPES = 20; 
 
         const scoreDisplay = document.getElementById('score');
         const timerDisplay = document.getElementById('timer');
@@ -164,19 +169,17 @@
         const raycasterEntity = document.getElementById('camera');
         const flashEffect = document.getElementById('flash-effect');
 
-        // ★新機能：1〜20の中からランダムな画像ID（#enemy-img-X）を返す関数
         function getRandomEnemyId() {
-            const randomNum = Math.floor(Math.random() * TOTAL_CHARACTER_TYPES) + 1; // 1〜20の整数
+            const randomNum = Math.floor(Math.random() * TOTAL_CHARACTER_TYPES) + 1;
             return `#enemy-img-${randomNum}`;
         }
 
-        // ゲーム開始
         function startGame() {
             score = 0; timeLeft = 30; isPlaying = true;
             scoreDisplay.textContent = score; timerDisplay.textContent = timeLeft;
             resultScreen.style.display = 'none';
             removeOldEnemies();
-            createEnemies(); // 敵を作る（ここがランダム化されます）
+            createEnemies();
 
             gameInterval = setInterval(() => {
                 timeLeft--; timerDisplay.textContent = timeLeft;
@@ -184,21 +187,16 @@
             }, 1000);
         }
 
-        // ゲーム終了
         function endGame() {
             clearInterval(gameInterval); isPlaying = false;
             finalScoreDisplay.textContent = score + " 点";
             resultScreen.style.display = 'flex'; removeOldEnemies();
         }
 
-        // ★変更点：敵を生成するときに画像をランダムにする
         function createEnemies() {
             for (let i = 0; i < ENEMY_COUNT; i++) {
                 const enemy = document.createElement('a-image');
-                
-                // ★src属性に、ランダムな画像ID（#enemy-img-1〜20）をセットする
                 enemy.setAttribute('src', getRandomEnemyId());
-                
                 enemy.setAttribute('class', 'target');
                 enemy.setAttribute('width', '0.8'); enemy.setAttribute('height', '0.8');
                 setRandomPosition(enemy);
@@ -206,7 +204,6 @@
             }
         }
 
-        // 敵の位置をランダムに配置
         function setRandomPosition(entity) {
             const theta = Math.random() * Math.PI * 2;
             const phi = (Math.random() - 0.5) * Math.PI / 2.5;
@@ -217,13 +214,11 @@
             entity.setAttribute('position', `${x} ${y} ${z}`);
         }
 
-        // 古い敵を削除
         function removeOldEnemies() {
             const enemies = document.querySelectorAll('.target');
             enemies.forEach(e => e.parentNode.removeChild(e));
         }
 
-        // 「撃つ」処理
         function fireWeapon(e) {
             if (e) e.preventDefault();
             if (!isPlaying) return;
@@ -247,10 +242,8 @@
 
                     hitTarget.setAttribute('visible', 'false');
                     
-                    // ★撃たれた敵が、次に再出現する前に画像を切り替える
                     setTimeout(() => {
                         if(isPlaying) {
-                            // ★再出現する前に、src属性を新しいランダムな画像に書き換える
                             hitTarget.setAttribute('src', getRandomEnemyId());
                             setRandomPosition(hitTarget);
                             hitTarget.setAttribute('visible', 'true');
@@ -260,13 +253,11 @@
             }
         }
 
-        // 操作設定
         shootBtn.addEventListener('touchstart', fireWeapon, { passive: false });
         shootBtn.addEventListener('mousedown', fireWeapon);
         retryBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startGame(); });
         retryBtn.addEventListener('click', startGame);
 
-        // 開始
         startGame();
     </script>
 </body>

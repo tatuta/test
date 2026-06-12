@@ -3,22 +3,20 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>文化祭 ARシューティング（通常スタート版）</title>
+    <title>文化祭 ARシューティング（iPhone対応版）</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <style>
-        /* 画面全体のズレやスクロール、巨大化を完全に禁止 */
         html, body { 
             margin: 0; padding: 0; width: 100%; height: 100dvh; 
             overflow: hidden; user-select: none; touch-action: none; 
             background-color: #000;
         }
 
-        /* 全ての画面を同じ大きさでピタッと重ねる箱 */
         .game-container {
             position: relative; width: 100%; height: 100dvh; overflow: hidden;
         }
 
-        /* 🎥 カメラ映像（一番奥） */
+        /* 🎥 カメラ映像 */
         #webcam {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; z-index: 1;
@@ -97,21 +95,23 @@
         }
         #shoot-btn:active { transform: translateX(-50%) scale(0.90); background: rgba(255, 0, 0, 0.95); }
 
-        /* 🟢 起動時の「タイトル画面」（センサーポップアップを邪魔しない設定に修正） */
+        /* 🟢 起動時の待機画面 */
         #start-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 5; /* センサーボタン(z-index:1000枚目くらいに出る)を隠さないように数値を下げました */
-            background: rgba(0, 0, 0, 0.85);
+            z-index: 35; background: rgba(0, 0, 0, 0.9);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: white; font-family: sans-serif;
+            color: white; font-family: sans-serif; text-align: center;
         }
-        #start-screen h1 { font-size: 24px; color: #ffeb3b; margin: 0 0 25px 0; text-align: center; padding: 0 20px; }
+        #start-screen h1 { font-size: 24px; color: #ffeb3b; margin: 0 0 15px 0; padding: 0 20px; }
         
+        /* 案内テキスト */
+        #guide-text { font-size: 16px; color: #ffeb3b; line-height: 1.6; margin-bottom: 20px; padding: 0 25px; }
+
         #start-btn {
-            padding: 12px 40px; font-size: 20px; font-weight: bold;
+            padding: 12px 50px; font-size: 20px; font-weight: bold;
             background-color: #4caf50; color: white; border: none; border-radius: 25px; cursor: pointer;
             box-shadow: 0 4px 12px rgba(76,175,80,0.4);
-            pointer-events: auto;
+            display: none; /* 最初は非表示。センサー許可後に登場 */
         }
         #start-btn:active { transform: scale(0.95); }
 
@@ -132,11 +132,12 @@
 </head>
 <body>
 
-    <div class="game-container">
+    <div class="game-container" id="tap-zone">
         <video id="webcam" autoplay playsinline></video>
 
         <div id="start-screen">
             <h1>ARシューティングゲーム</h1>
+            <p id="guide-text">【ここをタップしてください】<br>カメラとセンサーの許可が出たら「Allow(許可)」を押してください。</p>
             <button id="start-btn">START</button>
         </div>
 
@@ -214,6 +215,7 @@
         let timeLeft = 30;
         let gameInterval;
         let isPlaying = false;
+        let sensorUnlocked = false;
         
         const ENEMY_COUNT = 8; 
         const TOTAL_CHARACTER_TYPES = 20; 
@@ -223,6 +225,7 @@
         const uiContainer = document.getElementById('ui');
         const reticle = document.getElementById('reticle');
         const startScreen = document.getElementById('start-screen');
+        const guideText = document.getElementById('guide-text');
         const startBtn = document.getElementById('start-btn');
         const resultScreen = document.getElementById('result-screen');
         const finalScoreDisplay = document.getElementById('final-score');
@@ -232,10 +235,41 @@
         const raycasterEntity = document.getElementById('camera');
         const flashEffect = document.getElementById('flash-effect');
         const scorePopup = document.getElementById('score-popup');
+        const tapZone = document.getElementById('tap-zone');
 
-        function getRandomEnemyNumber() {
-            return Math.floor(Math.random() * TOTAL_CHARACTER_TYPES) + 1;
+        // ★iOS(iPhone)向けのタップ連動センサー解放処理
+        function unlockSensors() {
+            if (sensorUnlocked) return;
+            
+            initAudio(); // 音声を解放
+
+            // A-Frameに明示的にデバイスモーションを要求させる（タップ連動）
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            activateStartButton();
+                        } else {
+                            guideText.innerHTML = "<span style='color:#ff5722;'>センサーの許可が拒否されました。<br>設定からブラウザの動作権限を確認してください。</span>";
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Androidやダイアログが不要な環境の場合
+                activateStartButton();
+            }
         }
+
+        function activateStartButton() {
+            sensorUnlocked = true;
+            guideText.style.color = "#4caf50";
+            guideText.innerHTML = "準備完了！下のボタンを押してスタート";
+            startBtn.style.display = 'block'; // STARTボタンを表示
+        }
+
+        // 画面をどこでもタップしたらセンサー解放を試みる
+        tapZone.addEventListener('click', unlockSensors);
+        tapZone.addEventListener('touchstart', unlockSensors);
 
         // ゲーム開始
         function startGame() {
@@ -246,11 +280,10 @@
             resultScreen.style.display = 'none';
             uiContainer.style.display = 'block';
             shootBtn.style.display = 'block';
-            reticle.style.display = 'block'; // 照準を表示
+            reticle.style.display = 'block';
             
             removeOldEnemies();
             createEnemies();
-            initAudio();
 
             gameInterval = setInterval(() => {
                 timeLeft--; timerDisplay.textContent = timeLeft;
@@ -371,8 +404,8 @@
         });
 
         // イベント登録
-        startBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startGame(); });
-        startBtn.addEventListener('click', startGame);
+        startBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); startGame(); });
+        startBtn.addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
 
         shootBtn.addEventListener('touchstart', fireWeapon, { passive: false });
         shootBtn.addEventListener('mousedown', fireWeapon);
